@@ -23,48 +23,57 @@ import statistics
 
 goal = 'the quick brown fox jumps over the lazy dog'
 
+class Specimen:
+    """Represents a specimen."""
 
-def generate_specimen(length, seed=''):
-    """Generate a new specimen of the given length, using the given seed.
+    def generate_code(self, length, seed=''):
+        """Generate a new code of the given length, using the given seed.
 
-    Based on the seed, generate a specimen with the specified length.
-    Example if the seed is 'a' and length is 5, then the specimen will
-    be 'aaaaa'. With a multicharacter seed, repeat the seed. For example
-    with seed 'abc', and length 10, the specimen should be 'abcabcabca'.
-    With an empty seed, just generate a specimen of the given length with
-    random characters.
-    """
-    specimen = ''
+        Based on the seed, generate a code with the specified length.
+        Example if the seed is 'a' and length is 5, then the code will
+        be 'aaaaa'. With a multicharacter seed, repeat the seed. For example
+        with seed 'abc', and length 10, the code should be 'abcabcabca'.
+        With an empty seed, just generate a code of the given length with
+        random characters.
+        """
+        code = ''
 
-    if seed == '':
-        source = string.ascii_lowercase + ' '
-        return ''.join(random.choice(source) for i in range(length))
-    else:
-        while len(specimen) < length:
-            specimen += seed
-        return specimen[:length]
+        if seed == '':
+            source = string.ascii_lowercase + ' '
+            return ''.join(random.choice(source) for i in range(length))
+        else:
+            while len(code) < length:
+                code += seed
+            return code[:length]
+
+    def code_fitness(self, goal):
+        result = 0
+        for i in range(len(self.code)):
+            if self.code[i] == goal[i]:
+                result += 1
+        return result
+
+    def __init__(self, goal, generation, code=''):
+        if code == '':
+            self.code = self.generate_code(len(goal))
+        else:
+            self.code = code
+        self.fitness = self.code_fitness(goal)
+        self.generation = generation
 
 
-def specimen_fitness(specimen, goal):
-    result = 0
-    for i in range(len(specimen)):
-        if specimen[i] == goal[i]:
-            result += 1
-    return result
-
-
-def mutation(specimen):
+def mutation(code):
     source = string.ascii_lowercase + ' '
     newValue = random.choice(source)
-    position = random.randint(0, len(specimen) - 1)
-    mutable = list(specimen)
+    position = random.randint(0, len(code) - 1)
+    mutable = list(code)
     mutable[position] = newValue
     return ''.join(mutable)
 
 
 def breed(parent_a, parent_b):
     childSize = max(len(parent_a), len(parent_b))
-    child = ''
+    child_code = ''
     for i in range(childSize):
         genePool = ''
         geneA = ''
@@ -82,69 +91,67 @@ def breed(parent_a, parent_b):
             geneSource = genePool
 
         if geneSource == 'a':
-            child += geneA
+            child_code += geneA
         else:
-            child += geneB
+            child_code += geneB
 
     has_mutation = random.randint(0, 1) == 1
     if has_mutation:
-        return mutation(child)
+        return mutation(child_code)
     else:
-        return child
+        return child_code
 
 
 def remove_older_generation(population, generation):
-    """Remove all especimens equal or older to the given generation number."""
-    population = [s for s in population if s[2] > generation]
+    """Remove all specimens equal or older to the given generation number."""
+    population = [s for s in population if s.generation > generation]
 
 
 def find_fittest(population):
     maxFit = 0
-    fittest = ()
+    fittest = None
     for s in population:
-        if s[1] > maxFit:
+        if s.fitness > maxFit:
             fittest = s
-            maxFit = s[1]
+            maxFit = s.fitness
     return fittest
 
 
 def minimum_breed_fitness(population):
     """Return the minimum fitness required for breeding."""
-    non_zero_fitnesses = [s[1] for s in population if s[1] > 0]
+    non_zero_fitnesses = [s.fitness for s in population if s.fitness > 0]
     return statistics.median_low(non_zero_fitnesses)
 
 
-def colour_match(specimen, goal):
+def colour_match(code, goal):
     """Return a string where characters matching the goal appear green."""
     OKGREEN = '\033[92m'
     ENDC = '\033[0m'
     result = ''
-    for i in range(len(specimen)):
-        if specimen[i] == goal[i]:
-            result += OKGREEN + specimen[i] + ENDC
+    for i in range(len(code)):
+        if code[i] == goal[i]:
+            result += OKGREEN + code[i] + ENDC
         else:
-            result += specimen[i]
+            result += code[i]
     return result
 
 
-def print_match(specimen, goal):
-    result = colour_match(specimen, goal)
+def print_match(code, goal):
+    result = colour_match(code, goal)
     print(result)
 
 
-def print_population_info(population, generation, goal):
-    print('-- generation ' + str(generation) +':')
-
+def print_population_info(population, goal):
     # i = 1
     # for s in population:
-    #     print(i, s[2], colour_match(s[0], goal), s[1])
+    #     print(i, s.generation, colour_match(s.code, goal), s.fitness)
     #     i += 1
 
     fittest = find_fittest(population)
-    print('fittest:', colour_match(fittest[0], goal), fittest[1])
+    print('fittest:', colour_match(fittest.code, goal), fittest.fitness)
     print('population:', len(population))
 
-    return fittest[1]
+    return fittest.fitness
 
 # ---
 
@@ -153,12 +160,12 @@ population = []
 goalLength = len(goal)
 gen = 0
 for i in range(32):
-    specimen = generate_specimen(goalLength)
-    specimenInfo = (specimen, specimen_fitness(specimen, goal), gen)
-    population.append(specimenInfo)
+    specimen = Specimen(goal, gen)
+    population.append(specimen)
 
 # Print population info
-highest_fitness = print_population_info(population, gen, goal)
+print('-- generation ' + str(gen) +':')
+highest_fitness = print_population_info(population, goal)
 
 cont = ''
 while (cont.lower() != 'n') and (highest_fitness < len(goal)):
@@ -170,19 +177,20 @@ while (cont.lower() != 'n') and (highest_fitness < len(goal)):
 
     for s in population:
         # Only breed parents with a fitness greater or equal to min_breed_fitness
-        if (s[1] >= min_breed_fitness) and (len(parents) < 2):
+        if (s.fitness >= min_breed_fitness) and (len(parents) < 2):
             parents.append(s)
         if len(parents) == 2:
-            child = breed(parents[0][0], parents[1][0])
-            childInfo = (child, specimen_fitness(child, goal), gen+1)
-            new_generation.append(childInfo)
+            child_code = breed(parents[0].code, parents[1].code)
+            child = Specimen(goal, gen+1, child_code)
+            new_generation.append(child)
             parents = []
 
     population += new_generation
     gen += 1
-    population = [s for s in population if s[2] > gen - 3]
+    population = [s for s in population if s.generation > gen - 3]
 
     # Print population info
-    highest_fitness = print_population_info(population, gen, goal)
+    print('-- generation ' + str(gen) +':')
+    highest_fitness = print_population_info(population, goal)
     
     cont = input("Continue? [Y/n]")
